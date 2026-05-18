@@ -1,21 +1,52 @@
+import requests
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
+
+# Import the specialized LLM connections from our client file
 from app.utils.hf_client import get_medical_specialist_llm, get_nutrition_specialist_llm
 
-# --- MOCK DATABASES ---
-MOCK_DRUG_DB = {
-    ("ibuprofen", "lisinopril"): "Warning: Can decrease blood pressure control and strain kidneys.",
-    ("metformin", "lisinopril"): "Safe: No known adverse interactions.",
-    ("warfarin", "aspirin"): "SEVERE WARNING: High risk of internal bleeding. Immediate medical consultation required.",
-}
+# ==========================================
+# HELPER FUNCTIONS (For APIs)
+# ==========================================
 
-MOCK_DOCTOR_DB = [
-    {"name": "Dr. Sarah Adams", "specialty": "cardiologist", "location": "seattle", "rating": 4.9},
-    {"name": "Dr. Rajesh Sharma", "specialty": "endocrinologist", "location": "seattle", "rating": 4.8},
-    {"name": "Dr. Emily Lee", "specialty": "general practice", "location": "portland", "rating": 4.7},
-]
+def get_rxcui(drug_name: str) -> str:
+    """Fetches the NIH RxCUI ID for a given drug."""
+    url = f"https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug_name}"
+    try:
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        if "idGroup" in data and "rxnormId" in data["idGroup"]:
+            return data["idGroup"]["rxnormId"][0]
+    except Exception as e:
+        print(f"Error fetching RxCUI for {drug_name}: {e}")
+    return None
 
-# --- UPGRADED DIAGNOSTIC TOOL ---
+def get_fda_drug_info(drug_name: str) -> str:
+    """Fetches general indications and warnings directly from the OpenFDA API."""
+    url = f'https://api.fda.gov/drug/label.json?search=openfda.generic_name:"{drug_name}"+openfda.brand_name:"{drug_name}"&limit=1'
+    try:
+        response = requests.get(url, timeout=5)
+        if response.status_code == 200:
+            data = response.json()["results"][0]
+            
+            # Extract and truncate the data so we don't overwhelm the LLM's context window
+            indications = data.get("indications_and_usage", ["No specific indications found."])[0][:600]
+            warnings = data.get("warnings", ["No general warnings found."])[0][:600]
+            adverse = data.get("adverse_reactions", ["No adverse reactions listed."])[0][:600]
+            
+            return f"""FDA Clinical Data for {drug_name.upper()}:
+            - INDICATIONS: {indications}...
+            - WARNINGS: {warnings}...
+            - ADVERSE REACTIONS: {adverse}..."""
+    except Exception:
+        pass
+    
+    return f"Could not retrieve specific FDA database info for {drug_name}. Please rely on your general clinical knowledge."
+
+# ==========================================
+# THE AGENT TOOLS
+# ==========================================
+
 @tool
 def analyze_symptoms_for_disease(symptoms: str, patient_context: str = "None") -> str:
     """
@@ -23,10 +54,8 @@ def analyze_symptoms_for_disease(symptoms: str, patient_context: str = "None") -
     It routes the symptoms to a highly specialized medical AI to map symptoms to potential diseases.
     """
     try:
-        # 1. Initialize the specialist model
         medical_llm = get_medical_specialist_llm()
         
-        # 2. Craft a strict, clinical prompt for the specialist
         clinical_prompt = f"""You are an expert clinical diagnostic AI. 
         Analyze the following symptoms and provide the top 3 most likely differential diagnoses.
         Provide a brief rationale for each based on the symptoms.
@@ -38,36 +67,98 @@ def analyze_symptoms_for_disease(symptoms: str, patient_context: str = "None") -
         Format the output clearly with bullet points.
         """
         
-        # 3. Ask the specialist LLM
         response = medical_llm.invoke([HumanMessage(content=clinical_prompt)])
-        
-        # 4. Return the specialist's findings back to the main LangGraph agent
         return f"Specialist Medical AI Findings:\n{response.content}"
         
     except Exception as e:
-        return "System Note: The specialized medical analysis model is currently unavailable or overloaded. Please advise the user to consult a doctor."
+        return "System Note: The specialized medical analysis model is currently unavailable. Please advise the user to consult a doctor."
 
-# --- EXISTING TOOLS ---
 @tool
-def search_doctors(location: str, specialty: str) -> str:
-    """Finds recommended doctors nearby based on location and specialty."""
-    loc = location.lower()
-    spec = specialty.lower()
-    matches = [doc for doc in MOCK_DOCTOR_DB if doc["location"] == loc and spec in doc["specialty"]]
+def search_doctors(city: str, specialty: str) -> str:
+    """
+    Finds hospitals, clinics, and medical specialists globally.
+    Connects to the OpenStreetMap (Nominatim) public database.
+    """
+    # OpenStreetMap requires a User-Agent header for their free API
+    headers = {
+        "User-Agent": "DocBuddy-HealthApp/1.0"
+    }
     
-    if not matches:
-        return f"I couldn't find any highly-rated {specialty}s currently available in {location}."
+    query = f"{specialty} in {city}"
+    url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&addressdetails=1&limit=5"
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=8)
+        data = response.json()
         
-    results = "\n".join([f"- {doc['name']} ({doc['specialty'].title()}) - Rating: {doc['rating']}/5" for doc in matches])
-    return f"Here are the top-rated specialists I found in {location}:\n{results}"
+        # Fallback: If a highly specific specialty fails, search for general clinics nearby
+        if not data:
+            fallback_url = f"https://nominatim.openstreetmap.org/search?q=clinic or hospital in {city}&format=json&addressdetails=1&limit=3"
+            response = requests.get(fallback_url, headers=headers, timeout=8)
+            data = response.json()
+            
+        if not data:
+            return f"I couldn't find any medical facilities for {specialty} in {city} in the public map database. Try searching for a broader term or a larger neighboring city."
+            
+        formatted_results = []
+        for place in data:
+            # Extract the name of the clinic/hospital
+            name = place.get("name") or place.get("display_name", "Unknown Facility").split(",")[0]
+            
+            # Extract the full address
+            address = place.get("display_name", "Address unlisted")
+            
+            formatted_results.append(f"- {name} | Location: {address}")
+            
+        return f"Here are the nearest medical facilities I found in or near {city}:\n" + "\n".join(formatted_results)
+
+    except Exception as e:
+        print(f"OpenStreetMap API Error: {e}")
+        return "System Note: The global map database is currently unresponsive. Please try again later."
 
 @tool
-def check_drug_interactions(medication_1: str, medication_2: str) -> str:
-    """Checks for adverse drug-drug interactions between two specific medications."""
-    meds = tuple(sorted([medication_1.lower(), medication_2.lower()]))
-    if meds in MOCK_DRUG_DB:
-        return MOCK_DRUG_DB[meds]
-    return f"No severe interactions documented in the database between {medication_1} and {medication_2}."
+def analyze_medications(medications: list[str]) -> str:
+    """
+    ALWAYS use this tool when a user mentions medications or drugs.
+    - If 1 medication is provided: Returns general FDA usage, side effects, and warnings.
+    - If 2 medications are provided: Checks the NIH database for adverse drug interactions.
+    """
+    if not medications:
+        return "No medications provided to analyze."
+        
+    # --- MODE 1: General Drug Information (OpenFDA) ---
+    if len(medications) == 1:
+        return get_fda_drug_info(medications[0])
+        
+    # --- MODE 2: Drug-Drug Interactions (NIH RxNav) ---
+    elif len(medications) >= 2:
+        med1, med2 = medications[0], medications[1]
+        
+        rx1 = get_rxcui(med1)
+        rx2 = get_rxcui(med2)
+        
+        if not rx1 or not rx2:
+            return f"Could not find official clinical records to compare {med1} and {med2}. Verify spelling."
+
+        url = f"https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis={rx1}+{rx2}"
+        try:
+            response = requests.get(url, timeout=5)
+            data = response.json()
+            
+            if "fullInteractionTypeGroup" in data:
+                interactions = []
+                for group in data["fullInteractionTypeGroup"]:
+                    for interaction in group["fullInteractionType"]:
+                        description = interaction["interactionPair"][0]["description"]
+                        severity = interaction["interactionPair"][0].get("severity", "CAUTION")
+                        interactions.append(f"- [{severity.upper()}] {description}")
+                
+                return "NIH Database Interaction Warning:\n" + "\n".join(interactions)
+            else:
+                return f"No documented clinical interactions found between {med1} and {med2} in the NIH database."
+                
+        except Exception as e:
+            return "System Note: The National Institutes of Health (NIH) database is temporarily unreachable."
 
 @tool
 def generate_diet_plan(condition: str, restrictions: str = "None") -> str:
@@ -76,10 +167,8 @@ def generate_diet_plan(condition: str, restrictions: str = "None") -> str:
     It routes the condition to a specialized Dietitian AI to generate a custom medical diet.
     """
     try:
-        # 1. Initialize the Dietitian Model
         nutrition_llm = get_nutrition_specialist_llm()
         
-        # 2. Craft the strict Dietitian Prompt
         dietitian_prompt = f"""You are an expert Clinical Registered Dietitian. 
         A patient requires dietary intervention for the following condition: {condition}
         Their dietary restrictions/allergies are: {restrictions}
@@ -92,13 +181,19 @@ def generate_diet_plan(condition: str, restrictions: str = "None") -> str:
         Keep it highly clinical, safe, and format it beautifully with bullet points.
         """
         
-        # 3. Ask the Dietitian LLM
         response = nutrition_llm.invoke([HumanMessage(content=dietitian_prompt)])
-        
-        # 4. Return the findings back to DocBuddy
         return f"Clinical Dietitian AI Recommendations:\n{response.content}"
         
     except Exception as e:
-        return "System Note: The specialized nutrition model is currently unavailable. Recommend a doctor or dietician."
+        return "System Note: The specialized nutrition model is currently unavailable. Recommend a general balanced diet for now."
 
-evaluator_tools = [analyze_symptoms_for_disease, search_doctors, check_drug_interactions, generate_diet_plan]
+# ==========================================
+# TOOL EXPORT
+# ==========================================
+
+evaluator_tools = [
+    analyze_symptoms_for_disease, 
+    search_doctors, 
+    analyze_medications, 
+    generate_diet_plan
+]

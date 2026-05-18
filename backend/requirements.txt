@@ -5,3 +5,4 @@ langgraph
 langchain-huggingface
 langchain-core
 python-dotenv
+requests
