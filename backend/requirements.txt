@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-multipart
+langgraph
+langchain-huggingface
+langchain-core
+python-dotenv
