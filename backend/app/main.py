@@ -22,31 +22,21 @@ async def chat_endpoint(
     message: str = Form(...),
     file: UploadFile = File(None)
 ):
-    """
-    Accepts a message and optional file from the frontend, 
-    runs it through the LangGraph agent, and returns the response.
-    """
     try:
-        # 1. Handle optional file uploads (Placeholder for future Vision LLM integration)
         file_context = ""
         if file:
             file_context = f"\n[System Note: The user attached a file named '{file.filename}'.]"
-            # To actually read medical reports, you would process file.file.read() here 
-            # with a vision model like Qwen2.5-VL before passing the text to Llama.
 
-        # 2. Combine the user's message and file context
         full_prompt = message + file_context
-
-        # 3. Format the input for LangGraph
         inputs = {"messages": [HumanMessage(content=full_prompt)]}
         
-        # 4. Set configuration for memory tracking (Thread ID keeps the conversation context)
+        # Using a static thread_id for now. 
+        # In the future, this would be the actual Patient's ID from your frontend.
         config = {"configurable": {"thread_id": "patient_session_001"}}
 
-        # 5. Execute the LangGraph workflow
-        result = health_evaluator.invoke(inputs, config)
-
-        # 6. Extract the final AI response from the state
+        # UPGRADE: Changed .invoke() to .ainvoke() for asynchronous, non-blocking execution
+        result = await health_evaluator.ainvoke(inputs, config)
+        
         final_message = result["messages"][-1].content
 
         return {"reply": final_message}
@@ -54,7 +44,7 @@ async def chat_endpoint(
     except Exception as e:
         print(f"Error during graph execution: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
+    
 # Health check route
 @app.get("/")
 def read_root():
