@@ -7,7 +7,8 @@ load_dotenv()
 def get_hf_llm():
     """Initializes and returns the Hugging Face Chat Model."""
     
-    # Define the endpoint for a highly capable open-source model
+    hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+
     llm = HuggingFaceEndpoint(
         repo_id="meta-llama/Llama-3.3-70B-Instruct",
         task="text-generation",
