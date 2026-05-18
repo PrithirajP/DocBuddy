@@ -1,3 +1,12 @@
 folder_structure.txt
-backend/myvenv
+backend/myvenv/
 backend/.env
+backend/app/utils/__pycache__/
+backend/app/utils/*.py[cod]
+
+backend/app/agent/__pycache__/
+backend/app/agent/*.py[cod]
+
+
+backend/app/__pycache__/
+backend/app/*.py[cod]
