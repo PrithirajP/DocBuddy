@@ -26,7 +26,7 @@ def get_medical_specialist_llm():
     """The Clinical Diagnostic Model (Fine-tuned specifically for medicine)"""
     llm = HuggingFaceEndpoint(
         # Llama3-OpenBioLLM is a SOTA medical model. We use 8B for faster serverless inference.
-        repo_id="aaditya/Llama3-OpenBioLLM-70B", 
+        repo_id="aaditya/Llama3-OpenBioLLM-8B", 
         task="text-generation",
         max_new_tokens=512,
         do_sample=False,
