@@ -3,6 +3,7 @@ from app.utils.hf_client import get_hf_llm
 from app.agent.tools import evaluator_tools
 from langgraph.graph import END
 
+# Initialize the main Orchestrator LLM
 llm = get_hf_llm()
 model_with_tools = llm.bind_tools(evaluator_tools)
 
@@ -18,7 +19,8 @@ async def clinical_evaluator_node(state: dict):
                 "- If the user describes symptoms, you MUST use the 'analyze_symptoms_for_disease' tool to consult the Medical Specialist AI.\n"
                 "- If the user asks about diets or nutrition, you MUST use the 'generate_diet_plan' tool to consult the Dietitian AI.\n"
                 "- If the user mentions medications, you MUST use the 'analyze_medications' tool to check the FDA/NIH databases.\n"
-                "- If the user needs a physical doctor or clinic, you MUST use the 'search_doctors' tool to check the global map database.\n\n"
+                "- If the user needs a physical doctor or clinic, you MUST use the 'search_doctors' tool to check the global map database.\n"
+                "- If the user attaches an image or file, you MUST use the 'analyze_medical_image' tool to look at it.\n\n"
                 "When your tools return information, summarize their findings warmly and clearly for the patient using markdown bullet points. "
                 "CRITICAL: Always include a brief disclaimer that you are an AI assistant and they should consult a real doctor for medical emergencies."
             )

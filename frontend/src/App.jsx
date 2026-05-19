@@ -3,7 +3,6 @@ import ChatWindow from './components/ChatWindow';
 import ChatInput from './components/ChatInput';
 
 function App() {
-  // 1. We added 'setThreadId' so we can change the ID on the fly
   const [threadId, setThreadId] = useState(() => crypto.randomUUID());
 
   const [messages, setMessages] = useState([
@@ -14,7 +13,6 @@ function App() {
   ]);
   const [loading, setLoading] = useState(false);
 
-  // 2. The New Chat function: generates a new ID and clears the screen
   const handleNewChat = () => {
     setThreadId(crypto.randomUUID());
     setMessages([
@@ -62,13 +60,10 @@ function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col items-center py-8 px-4 sm:px-6">
       <div className="w-full max-w-4xl flex flex-col gap-6">
         
-        {/* Header section */}
         <header className="relative flex flex-col items-center text-center space-y-3 mt-4">
-          
-          {/* 3. The New Chat Button positioned in the top right corner */}
           <button 
             onClick={handleNewChat}
-            className="absolute right-0 top-0 text-sm font-medium text-slate-500 hover:text-teal-600 bg-white border border-slate-200 hover:border-teal-300 px-4 py-2 rounded-xl shadow-sm transition-all flex items-center gap-2"
+            className="absolute right-0 top-0 text-sm font-medium text-slate-500 hover:text-teal-600 bg-white border border-slate-200 hover:border-teal-300 px-4 py-2 rounded-xl shadow-sm transition-all flex items-center gap-2 cursor-pointer"
           >
             <span>+</span> New Chat
           </button>
@@ -85,7 +80,7 @@ function App() {
 
         <div className="bg-white p-3 sm:p-4 rounded-[2rem] shadow-xl border border-slate-200/60 w-full mt-2">
           <ChatWindow messages={messages} loading={loading} />
-          <div className="px-2 pb-2">
+          <div className="px-2 pb-2 mt-4">
              <ChatInput onSendMessage={handleSendMessage} loading={loading} />
           </div>
         </div>

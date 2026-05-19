@@ -1,3 +1,6 @@
+import os
+import sqlite3
+import shutil
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_core.messages import HumanMessage
@@ -18,21 +21,30 @@ app.add_middleware(
 @app.post("/api/chat")
 async def chat_endpoint(
     message: str = Form(...),
-    thread_id: str = Form(...), # <-- NEW: The server now expects a chat ID
+    thread_id: str = Form(...),
     file: UploadFile = File(None)
 ):
     try:
         file_context = ""
         if file:
-            file_context = f"\n[System Note: The user attached a file named '{file.filename}'.]"
+            # Create a temporary folder to hold uploads for the Vision AI
+            os.makedirs("uploads", exist_ok=True)
+            file_path = f"uploads/{file.filename}"
+            
+            # Save the physical file to the disk
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+                
+            # Tell the Orchestrator EXACTLY where the file is!
+            file_context = f"\n\n[System Note: The user attached an image saved at '{file_path}'. You MUST use the 'analyze_medical_image' tool to look at it!]"
 
         full_prompt = message + file_context
         inputs = {"messages": [HumanMessage(content=full_prompt)]}
         
-        # We pass the dynamic thread_id from the frontend to isolate this specific chat
+        # Isolate this specific chat session using the frontend's thread_id
         config = {"configurable": {"thread_id": thread_id}}
 
-        # Execute the graph asynchronously (Memory is handled automatically by graph.py now!)
+        # Execute the graph asynchronously
         result = await health_evaluator.ainvoke(inputs, config)
         
         final_message = result["messages"][-1].content
