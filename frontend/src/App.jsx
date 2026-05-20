@@ -33,23 +33,29 @@ function App() {
     const formData = new FormData();
     formData.append('message', text);
     formData.append('thread_id', threadId); 
-    if (file) formData.append('file', file);
+    
+    if (file) {
+      formData.append('file', file);
+    }
 
     try {
       const response = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
-        body: formData,
+        body: formData, 
       });
       
-      if (!response.ok) throw new Error('Network error');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
       
       setMessages((prev) => [...prev, { sender: 'ai', text: data.reply }]);
     } catch (error) {
+      console.error("Chat API Error:", error);
       setMessages((prev) => [...prev, { 
         sender: 'ai', 
-        text: "❌ **Connection Error:** Unable to reach the clinic backend. Ensure FastAPI is running on port 8000." 
+        text: "❌ **Connection Error:** Unable to reach the clinic backend. Ensure FastAPI is running on port 8000 and `python-multipart` is installed." 
       }]);
     } finally {
       setLoading(false);
@@ -74,7 +80,7 @@ function App() {
           <div>
             <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">DocBuddy</h1>
             <p className="text-sm font-medium text-teal-600 mt-1 uppercase tracking-widest">Your AI Clinical Assistant</p>
-            <p className="text-xs text-slate-400 mt-2 font-mono">Session: {threadId.split('-')[0]}</p>
+            <p className="text-xs text-slate-400 mt-2 font-mono">Session ID: {threadId.split('-')[0]}</p>
           </div>
         </header>
 

@@ -10,3 +10,4 @@ backend/app/agent/*.py[cod]
 
 backend/app/__pycache__/
 backend/app/*.py[cod]
+backend/uploads
