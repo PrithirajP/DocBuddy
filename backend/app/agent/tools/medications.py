@@ -1,17 +1,25 @@
 import requests
 from langchain_core.tools import tool
+import os
 
 # --- HELPERS ---
 def get_rxcui(drug_name: str) -> str:
     url = f"https://rxnav.nlm.nih.gov/REST/rxcui.json?name={drug_name}"
-    headers = {"User-Agent": "DocBuddy-App/1.0"}
+    
+    # Apply the Good Citizen header here too!
+    dev_email = os.getenv("DEVELOPER_EMAIL", "developer@example.com")
+    headers = {
+        "User-Agent": f"DocBuddy-PortfolioProject/1.0 (mailto:{dev_email})",
+        "Accept": "application/json"
+    }
+    
     try:
         response = requests.get(url, headers=headers, timeout=15)
         data = response.json()
         if "idGroup" in data and "rxnormId" in data["idGroup"]:
             return data["idGroup"]["rxnormId"][0]
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"RxCUI Error for {drug_name}: {e}")
     return None
 
 def get_fda_drug_info(drug_name: str) -> str:
@@ -57,8 +65,10 @@ def analyze_medications(medications: list[str]) -> str:
 
         url = f"https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis={rx1}+{rx2}"
         
+        dev_email = os.getenv("DEVELOPER_EMAIL", "developer@example.com")
+
         headers = {
-            "User-Agent": "DocBuddy-PortfolioProject/1.0 (mailto:paulprithiraj89@gmail.com)",
+            "User-Agent": f"DocBuddy-PortfolioProject/1.0 (mailto:{dev_email})",
             "Accept": "application/json"
         }
         
