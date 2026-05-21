@@ -1,56 +1,22 @@
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import os
-import sqlite3
-import shutil
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from langchain_core.messages import HumanMessage
 
-# Import your compiled LangGraph workflow
-from app.agent.graph import health_evaluator
+os.makedirs("uploads", exist_ok=True)
 
-app = FastAPI(title="DocBuddy API")
+# Path to the compiled React build
+frontend_build_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../frontend/dist"))
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], 
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.post("/api/chat")
-async def chat_endpoint(
-    message: str = Form(...),
-    thread_id: str = Form(...),
-    file: UploadFile = File(None)
-):
-    try:
-        file_context = ""
-        if file:
-            # Create a temporary folder to hold uploads for the Vision AI
-            os.makedirs("uploads", exist_ok=True)
-            file_path = f"uploads/{file.filename}"
-            
-            # Save the physical file to the disk
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-                
-            # Tell the Orchestrator EXACTLY where the file is!
-            file_context = f"\n\n[System Note: The user attached an image saved at '{file_path}'. You MUST use the 'analyze_medical_image' tool to look at it!]"
-
-        full_prompt = message + file_context
-        inputs = {"messages": [HumanMessage(content=full_prompt)]}
-        
-        # Isolate this specific chat session using the frontend's thread_id
-        config = {"configurable": {"thread_id": thread_id}}
-
-        # Execute the graph asynchronously
-        result = await health_evaluator.ainvoke(inputs, config)
-        
-        final_message = result["messages"][-1].content
-
-        return {"reply": final_message}
-
-    except Exception as e:
-        print(f"Error during graph execution: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+if os.path.exists(frontend_build_path):
+    # Mount the assets folder
+    app.mount("/assets", StaticFiles(directory=os.path.join(frontend_build_path, "assets")), name="assets")
+    
+    # Catch-all route to serve the React index.html
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        file_path = os.path.join(frontend_build_path, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(frontend_build_path, "index.html"))
+else:
+    print("Warning: Frontend build not found. API is running, but UI will not load.")
