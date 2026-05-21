@@ -1,13 +1,21 @@
-folder_structure.txt
+# Virtual Environments
 backend/myvenv/
+env/
+venv/
+
+# Secrets and Keys
 backend/.env
-backend/app/utils/__pycache__/
-backend/app/utils/*.py[cod]
+.env
 
-backend/app/agent/__pycache__/
-backend/app/agent/*.py[cod]
+# User Uploads (Ignore the contents, but you can keep the folder itself if you want)
+backend/uploads/
+backend/uploads/*
 
+# Python Byte-compiled / Optimized / DLL files (This covers EVERY folder globally)
+__pycache__/
+*.py[cod]
+*$py.class
 
-backend/app/__pycache__/
-backend/app/*.py[cod]
-backend/uploads
+# Temporary/System files
+.DS_Store
+folder_structure.txt
