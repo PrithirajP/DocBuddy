@@ -31,7 +31,7 @@ User → React Frontend
     ┌────┴─────────────────────────────────┐
     │                                      │
  Symptoms Tool          Medications Tool   Diet Tool
- (OpenBioLLM-8B)       (FDA + NIH APIs)  (Llama-3.1-8B)
+ (Llama-3.1-8B)        (FDA API + AI)    (Llama-3.1-8B)
     │                                      │
  Doctors Tool                         Vision Tool
  (OpenStreetMap)               (Llama-3.2-11B-Vision)
@@ -43,8 +43,8 @@ Each user session is isolated via a `thread_id` with in-memory LangGraph checkpo
 
 ## Features
 
-- **Symptom Analysis** — Routes to a specialized OpenBioLLM model for differential diagnosis with urgency triage
-- **Drug Interaction Checker** — Queries the NIH RxNorm API for live interaction data; falls back to the FDA label database for single-drug lookups
+- **Symptom Analysis** — Routes to a specialized Llama-3.1 model for differential diagnosis with urgency triage
+- **Drug Interaction Checker** — Utilizes an Orchestrator LLM for live drug interaction analysis; falls back to the FDA label database for single-drug lookups
 - **Diet Planning** — A dedicated Llama-3.1-8B nutrition model generates condition-specific meal plans
 - **Doctor/Clinic Finder** — Searches globally via OpenStreetMap Nominatim with specialty-aware query mapping
 - **Medical Image Analysis** — Encodes uploaded images in Base64 and sends them to Llama-3.2-11B-Vision; includes an offline fallback cache for common image types
@@ -67,7 +67,7 @@ Each user session is isolated via a `thread_id` with in-memory LangGraph checkpo
 | Role | Model |
 |---|---|
 | Orchestrator / Router | `meta-llama/Llama-3.3-70B-Instruct` |
-| Clinical Diagnostics | `aaditya/Llama3-OpenBioLLM-8B` |
+| Clinical Diagnostics | `meta-llama/Llama-3.1-8B-Instruct` |
 | Nutrition Specialist | `meta-llama/Llama-3.1-8B-Instruct` |
 | Medical Vision | `meta-llama/Llama-3.2-11B-Vision-Instruct` |
 
@@ -108,6 +108,8 @@ DocBuddy/
 ## Deployment (HuggingFace Spaces)
 
 This project is deployed as a Docker Space on HuggingFace. The Dockerfile builds the React frontend and serves it as static files through FastAPI on port **7860**.
+
+**Continuous Deployment:** A GitHub Actions workflow is included (`.github/workflows/sync_to_hub.yml`) that automatically pushes your code to Hugging Face Spaces every time you commit and push to the `main` branch.
 
 ### Required Secrets
 
