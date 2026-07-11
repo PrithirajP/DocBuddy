@@ -2,6 +2,7 @@
 backend/myvenv/
 env/
 venv/
+.venv/
 
 # Secrets and Keys
 backend/.env
