@@ -7,3 +7,5 @@ langchain-core
 python-dotenv
 requests
 aiofiles
+pytest
+httpx

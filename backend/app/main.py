@@ -1,10 +1,11 @@
 import os
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 from dotenv import load_dotenv
+import shutil
+from app.agent.graph import health_evaluator
 
 load_dotenv()
 
@@ -17,23 +18,34 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-class ChatMessage(BaseModel):
-    message: str
-
 @app.get("/api/health")
 def health_check():
-    """Simple endpoint to verify the server is running."""
-    return {"status": "healthy", "service": "DocBuddy API"}
+    return {"status": "healthy"}
 
 @app.post("/api/chat")
-async def chat_endpoint(request: ChatMessage):
-    """
-    PASTE YOUR LANGGRAPH INVOCATION HERE
-    """
+async def chat_endpoint(
+    message: str = Form(...),
+    thread_id: str = Form(...),
+    file: UploadFile = File(None)
+):
     try:
-        user_input = request.message
+        user_input = message
         
-        return {"response": f"Message received: {user_input}"} # Replace this line
+        if file:
+            file_path = f"uploads/{file.filename}"
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            user_input += f"\n\n[Attached File: {file.filename} saved at {file_path}]"
+            
+        config = {"configurable": {"thread_id": thread_id}}
+        
+        # Invoke LangGraph
+        result = await health_evaluator.ainvoke({"messages": [("user", user_input)]}, config)
+        
+        # Extract the last message from the agent
+        final_message = result["messages"][-1].content
+        
+        return {"reply": final_message}
         
     except Exception as e:
         print(f"Server Error: {e}")
