@@ -1,6 +1,7 @@
 import requests
 from langchain_core.tools import tool
 import os
+from app.utils.hf_client import get_hf_llm
 
 # --- HELPERS ---
 def get_rxcui(drug_name: str) -> str:
@@ -57,39 +58,14 @@ def analyze_medications(medications: list[str]) -> str:
             tuple(sorted(["lisinopril", "ibuprofen"])): "- [MODERATE] Ibuprofen can decrease the blood-pressure-lowering effects of Lisinopril and may strain the kidneys."
         }
         
-        rx1 = get_rxcui(med1)
-        rx2 = get_rxcui(med2)
-        
-        if not rx1 or not rx2:
-            return f"Could not find official clinical records to compare {med1} and {med2}."
-
-        url = f"https://rxnav.nlm.nih.gov/REST/interaction/list.json?rxcuis={rx1}+{rx2}"
-        
-        dev_email = os.getenv("DEVELOPER_EMAIL", "developer@example.com")
-
-        headers = {
-            "User-Agent": f"DocBuddy-PortfolioProject/1.0 (mailto:{dev_email})",
-            "Accept": "application/json"
-        }
-        
         try:
-            response = requests.get(url, headers=headers, timeout=15)
-            data = response.json()
-            
-            if "fullInteractionTypeGroup" in data:
-                interactions = []
-                for group in data["fullInteractionTypeGroup"]:
-                    for interaction in group["fullInteractionType"]:
-                        description = interaction["interactionPair"][0]["description"]
-                        severity = interaction["interactionPair"][0].get("severity", "CAUTION")
-                        interactions.append(f"- [{severity.upper()}] {description}")
-                return "NIH Database Interaction Warning:\n" + "\n".join(interactions)
-            else:
-                return f"No documented clinical interactions found between {med1} and {med2}."
-                
+            llm = get_hf_llm()
+            prompt = f"Analyze potential clinical drug interactions between '{med1}' and '{med2}'. Focus strictly on pharmacological interactions and list the severity (SEVERE, MODERATE, or NONE). Keep it highly concise."
+            response = llm.invoke(prompt)
+            return "AI Interaction Analysis:\n" + response.content
         except Exception as e:
-            print(f"\n--- NIH API ERROR ---\n{e}\n------------------------\n")
+            print(f"\n--- LLM API ERROR ---\n{e}\n------------------------\n")
             meds_tuple = tuple(sorted([med1, med2]))
             if meds_tuple in FALLBACK_DB:
                 return "Interaction Warning (Cached Offline Backup):\n" + FALLBACK_DB[meds_tuple]
-            return "System Note: The NIH database is temporarily unreachable."
+            return "System Note: Interaction analysis is currently unavailable."

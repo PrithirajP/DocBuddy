@@ -23,15 +23,16 @@ def get_hf_llm():
     return ChatHuggingFace(llm=llm)
 
 def get_medical_specialist_llm():
-    """The Clinical Diagnostic Model (OpenBioLLM - NO Chat Wrapper)"""
-    return HuggingFaceEndpoint(
-        repo_id="aaditya/Llama3-OpenBioLLM-8B", 
+    """The Clinical Diagnostic Model"""
+    llm = HuggingFaceEndpoint(
+        repo_id="meta-llama/Llama-3.1-8B-Instruct", 
         task="text-generation",
         max_new_tokens=512,
         do_sample=False,
         temperature=0.1,
         huggingfacehub_api_token=get_hf_token()
     )
+    return ChatHuggingFace(llm=llm)
 
 def get_nutrition_specialist_llm():
     """The Dietitian Model"""

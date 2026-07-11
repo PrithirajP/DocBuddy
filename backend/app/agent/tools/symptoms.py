@@ -17,7 +17,7 @@ def analyze_symptoms_for_disease(symptoms: str, patient_context: str = "None") -
         Format the output clearly with bullet points."""
         
         response = medical_llm.invoke(clinical_prompt)
-        return f"Specialist Medical AI Findings:\n{response}"
+        return f"Specialist Medical AI Findings:\n{response.content}"
     except Exception as e:
         print(f"\n--- MEDICAL AI ERROR ---\n{e}\n------------------------\n")
         return "System Note: The specialized medical analysis model is currently unavailable."
