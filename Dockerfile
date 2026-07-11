@@ -25,5 +25,8 @@ COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 # Hugging Face Spaces strictly requires applications to run on port 7860
 EXPOSE 7860
 
+# Change working directory so Python can resolve the 'app' module
+WORKDIR /app/backend
+
 # Start the application
-CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
